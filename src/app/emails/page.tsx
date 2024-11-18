@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useRouter } from 'next/navigation'; // For navigation to Add Email Format page
 import { AiFillDelete } from 'react-icons/ai'; // Trash Icon
 import { BiMessageRoundedDetail } from 'react-icons/bi'; // Thread Icon
 import { HiOutlineLightBulb } from 'react-icons/hi'; // Suggestion Icon
@@ -75,6 +76,7 @@ export default function EmailsPage() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [companyDomain, setCompanyDomain] = useState('');
+  const router = useRouter(); // For navigating to the Add Email Format page
 
   const fetchEmails = async () => {
     try {
@@ -194,14 +196,42 @@ export default function EmailsPage() {
     }
   };
 
-  const handleGenerateEmails = () => {
+  const handleGenerateEmails = async () => {
     if (!firstName || !lastName || !companyDomain) {
       alert('Please fill in all fields: First Name, Last Name, and Company Domain.');
       return;
     }
-    const suggestions = generateEmailCombinations(firstName, lastName, companyDomain);
-    setEmailSuggestions(suggestions);
+  
+    try {
+      const response = await axios.get(`/api/company-format?companyName=${companyDomain}`);
+      const { email_format, domain } = response.data;
+  
+      if (email_format && domain) {
+        const email = email_format
+          .replace("{firstname}", firstName.toLowerCase())
+          .replace("{lastname}", lastName.toLowerCase())
+          .replace("{f}", firstName[0].toLowerCase())
+          .replace("{l}", lastName[0].toLowerCase())
+          .replace("{domain}", domain.toLowerCase());
+  
+        setEmailSuggestions([email]);
+      } else {
+        // This block is unlikely to be reached due to the backend logic.
+        alert(`No format found for ${companyDomain}. Redirecting to Add Email Format page.`);
+        router.push('/email-address-format');
+      }
+    } catch (error: any) {
+      if (error.response && error.response.status === 404) {
+        // Handle 404 - Company format not found
+        alert(`No format found for ${companyDomain}. Redirecting to Add Email Format page.`);
+        router.push('/email-address-format');
+      } else {
+        console.error('Error fetching company format:', error);
+        alert('An unexpected error occurred while fetching the company format.');
+      }
+    }
   };
+  
 
   const handleAddRecipients = () => {
     setRecipient((prev) => `${prev}${prev ? ', ' : ''}${selectedEmails.join(', ')}`);
@@ -236,7 +266,57 @@ export default function EmailsPage() {
         <div className="bg-gray-50 p-6 rounded-lg shadow-md">
           <h3 className="text-xl font-semibold mb-4">Compose Email</h3>
 
-          {/* Modal for Email Suggestions */}
+             <div className="mb-2 flex space-x-2">
+              {/* Recipient Input Field */}
+              <input
+                type="email"
+                placeholder="Recipient Email"
+                className="w-full p-3 border rounded-lg"
+                value={recipient}
+                onChange={(e) => setRecipient(e.target.value)}
+              />
+              
+              {/* Email Suggestion Button */}
+              <button
+                className="flex-1 text-black-600 hover:text-yellow-300 rounded-lg"
+                onClick={() => setShowSuggestionModal(true)}
+                title="Email Suggestions"
+              >
+                <HiOutlineLightBulb className="h-6 w-6" />
+              </button>
+            </div>
+     
+          <input
+            type="text"
+            placeholder="Subject"
+            className="w-full p-3 mb-4 border rounded-lg"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+          />
+          <textarea
+            placeholder="Email Content"
+            className="w-full p-3 mb-4 border rounded-lg"
+            rows={6}
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+          />
+          <div className="flex space-x-4">
+            <button
+              className="w-full p-3 rounded-lg text-white bg-blue-600 hover:bg-blue-700"
+              onClick={() => setShowModal(true)}
+            >
+              Generate Email
+            </button>
+            <button
+              className={`w-full p-3 rounded-lg text-white ${isLoading ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
+              onClick={handleSendEmail}
+              disabled={isLoading}
+            >
+              {isLoading ? 'Sending...' : 'Send Email'}
+            </button>
+          </div>
+        </div>
+
           {/* Modal for Email Suggestions */}
           {showSuggestionModal && (
             <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center overflow-y-auto">
@@ -327,57 +407,6 @@ export default function EmailsPage() {
               </div>
             </div>
           )}
-
-             <div className="mb-2 flex space-x-2">
-              {/* Recipient Input Field */}
-              <input
-                type="email"
-                placeholder="Recipient Email"
-                className="w-full p-3 border rounded-lg"
-                value={recipient}
-                onChange={(e) => setRecipient(e.target.value)}
-              />
-              
-              {/* Email Suggestion Button */}
-              <button
-                className="flex-1 text-black-600 hover:text-yellow-300 rounded-lg"
-                onClick={() => setShowSuggestionModal(true)}
-                title="Email Suggestions"
-              >
-                <HiOutlineLightBulb className="h-6 w-6" />
-              </button>
-            </div>
-     
-          <input
-            type="text"
-            placeholder="Subject"
-            className="w-full p-3 mb-4 border rounded-lg"
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-          />
-          <textarea
-            placeholder="Email Content"
-            className="w-full p-3 mb-4 border rounded-lg"
-            rows={6}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-          />
-          <div className="flex space-x-4">
-            <button
-              className="w-full p-3 rounded-lg text-white bg-blue-600 hover:bg-blue-700"
-              onClick={() => setShowModal(true)}
-            >
-              Generate Email
-            </button>
-            <button
-              className={`w-full p-3 rounded-lg text-white ${isLoading ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
-              onClick={handleSendEmail}
-              disabled={isLoading}
-            >
-              {isLoading ? 'Sending...' : 'Send Email'}
-            </button>
-          </div>
-        </div>
 
         {/* Sent Emails Section */}
         <div className="bg-gray-50 p-6 rounded-lg shadow-md overflow-y-auto">
