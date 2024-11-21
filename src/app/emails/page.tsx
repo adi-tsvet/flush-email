@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation'; // For navigation to Add Email Format page
 import { AiFillDelete } from 'react-icons/ai'; // Trash Icon
-import { BiMessageRoundedDetail } from 'react-icons/bi'; // Thread Icon
 import { HiOutlineLightBulb } from 'react-icons/hi'; // Suggestion Icon
 
 type Email = {
@@ -13,48 +13,17 @@ type Email = {
   subject: string;
   content: string;
   sent_at: string;
-  thread_id?: string; 
 };
-
-type ThreadMessage = {
+type Template = {
+  id: number;
+  title: string;
   subject: string;
-  from: string;
-  date: string;
-  snippet: string;
+  content: string;
+  visibility: "private" | "public";
 };
-
-// Email Combination Generator Function
-function generateEmailCombinations(firstName: string, lastName: string, domain: string): string[] {
-  const first = firstName.toLowerCase();
-  const last = lastName.toLowerCase();
-  const f = first[0];
-  const l = last[0];
-
-  // Ensure the domain has no leading or trailing spaces and ends with `.com`
-  const sanitizedDomain = domain.trim().toLowerCase();
-  const validDomain = sanitizedDomain.endsWith('.com') ? sanitizedDomain : `${sanitizedDomain}.com`;
-
-  // Generate combinations
-  return [
-    `${first}.${last}@${validDomain}`,
-    `${first}_${last}@${validDomain}`,
-    `${first}${last}@${validDomain}`,
-    `${first}${l}@${validDomain}`,
-    `${f}${last}@${validDomain}`,
-    `${f}.${last}@${validDomain}`,
-    `${first}@${validDomain}`,
-    `${last}@${validDomain}`,
-    `${f}${l}@${validDomain}`,
-    `${last}.${first}@${validDomain}`,
-    `${last}_${first}@${validDomain}`,
-    `${last}${first}@${validDomain}`,
-    `${last}${f}@${validDomain}`,
-    `${first}-${last}@${validDomain}`,
-    `${last}-${first}@${validDomain}`,
-  ];
-}
 
 export default function EmailsPage() {
+  const { data: session } = useSession();
   const [recipient, setRecipient] = useState<string>(''); // Recipient Field
   const [subject, setSubject] = useState('');
   const [content, setContent] = useState('');
@@ -63,19 +32,19 @@ export default function EmailsPage() {
   const [emails, setEmails] = useState<Email[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [thread, setThread] = useState<ThreadMessage[] | null>(null);
-  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
-  const [isLoadingThread, setIsLoadingThread] = useState(false);
-  const [threadError, setThreadError] = useState<string | null>(null);
-  const [showThreadModal, setShowThreadModal] = useState(false);
   const [showSuggestionModal, setShowSuggestionModal] = useState(false); // Modal Visibility
   const [emailSuggestions, setEmailSuggestions] = useState<string[]>([]); // Email Combinations
   const [selectedEmails, setSelectedEmails] = useState<string[]>([]); // Selected Emails to Add
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [companyDomain, setCompanyDomain] = useState('');
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [showTemplatesModal, setShowTemplatesModal] = useState(false); // Template Modal
+  const [searchTerm, setSearchTerm] = useState("");
   const router = useRouter(); // For navigating to the Add Email Format page
 
   const fetchEmails = async () => {
@@ -86,67 +55,49 @@ export default function EmailsPage() {
       console.error('Error fetching emails:', error);
     }
   };
-  const fetchThread = async (threadId: string) => {
-    setIsLoadingThread(true);
-    setThreadError(null);
-    setThread(null);
-    try {
-      const response = await axios.get(`/api/get-thread?threadId=${threadId}`);
-      setThread(response.data.thread);
-      setActiveThreadId(threadId);
-      setShowThreadModal(true);
-    } catch (error) {
-      console.error('Error fetching thread:', error);
-      setThreadError('Unable to load thread. Please try again later.');
-      setShowThreadModal(true); // Show modal with error message
-    } finally {
-      setIsLoadingThread(false);
-    }
-  };
-
-  const closeThreadModal = () => {
-    setShowThreadModal(false);
-    setActiveThreadId(null);
-    setThread(null);
-    setThreadError(null);
-  };
 
   const handleSendEmail = async () => {
+    setErrorMessage(""); // Clear previous errors
+    setSuccessMessage(""); // Clear success message
+  
     if (!recipient || !subject || !content) {
-      alert('Please fill in all required fields: Recipient, Subject, and Content.');
+      setErrorMessage("Please fill in all required fields: Recipient, Subject, and Content.");
       return;
     }
   
     setIsLoading(true);
     try {
-      const response = await axios.post('/api/send-email', {
+      const response = await axios.post("/api/send-email", {
         recipient,
         subject,
         content,
       });
   
-      if (response.data.status === 'completed') {
+      if (response.data.status === "completed") {
         const failedEmails = response.data.results.filter((res: any) => !res.emailSent);
   
         if (failedEmails.length > 0) {
-          alert(
-            `The following emails could not be sent:\n${failedEmails
-              .map((res: any) => `${res.recipient}: ${res.errorMessage}`)
-              .join('\n')}`
+          const errorDetails = failedEmails
+            .map((res: any) => `${res.recipient}: ${res.errorMessage}`)
+            .join("\n");
+  
+          setErrorMessage(
+            `The following emails could not be sent:\n${errorDetails}`
           );
+        } else {
+          setSuccessMessage("Emails sent successfully!");
+          // Clear the form after success
+          setRecipient("");
+          setSubject("");
+          setContent("");
         }
   
-        // Refresh emails
+        // Refresh the email list
         await fetchEmails();
-  
-        // Reset fields
-        setRecipient('');
-        setSubject('');
-        setContent('');
       }
     } catch (error) {
-      console.error('Error sending email:', error);
-      alert('An error occurred while sending the email. Please try again.');
+      console.error("Error sending email:", error);
+      setErrorMessage("An unexpected error occurred while sending the email.");
     } finally {
       setIsLoading(false);
     }
@@ -232,7 +183,6 @@ export default function EmailsPage() {
     }
   };
   
-
   const handleAddRecipients = () => {
     setRecipient((prev) => `${prev}${prev ? ', ' : ''}${selectedEmails.join(', ')}`);
     setShowSuggestionModal(false); // Close Modal
@@ -252,40 +202,84 @@ export default function EmailsPage() {
     setCompanyDomain('');
   };
 
+  const fetchTemplates = async () => {
+    try {
+      const response = await axios.get('/api/email-templates'); // Fetch templates
+      setTemplates(response.data);
+    } catch (error) {
+      console.error('Error fetching templates:', error);
+    }
+  };
+
+  const handleSelectTemplate = (template: Template) => {
+    setSubject(template.subject);
+    setContent(template.content);
+    setShowTemplatesModal(false); // Close modal after selection
+  };
+
+  const filteredEmails = emails.filter(
+    (email) =>
+      email.subject.toLowerCase().includes(searchTerm) ||
+      email.content.toLowerCase().includes(searchTerm)
+  );
   
 
   useEffect(() => {
     fetchEmails();
-  }, []);
+    fetchTemplates();
+  }, [session]);
 
   return (
-    <div className="relative bg-white shadow-md rounded-lg p-6">
+    <div className="bg-white shadow-md rounded-lg p-6">
       <h2 className="text-2xl font-semibold mb-6">Emails</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Compose Email Section */}
         <div className="bg-gray-50 p-6 rounded-lg shadow-md">
           <h3 className="text-xl font-semibold mb-4">Compose Email</h3>
-
-             <div className="mb-2 flex space-x-2">
-              {/* Recipient Input Field */}
-              <input
-                type="email"
-                placeholder="Recipient Email"
-                className="w-full p-3 border rounded-lg"
-                value={recipient}
-                onChange={(e) => setRecipient(e.target.value)}
-              />
-              
-              {/* Email Suggestion Button */}
-              <button
-                className="flex-1 text-black-600 hover:text-yellow-300 rounded-lg"
-                onClick={() => setShowSuggestionModal(true)}
-                title="Email Suggestions"
-              >
-                <HiOutlineLightBulb className="h-6 w-6" />
-              </button>
+          {/* Display Error Message */}
+          {errorMessage && (
+            <div className="bg-red-100 text-red-800 p-3 mb-4 rounded">
+              {errorMessage.includes("BadCredentials")
+                ? "Invalid Gmail ID or Gmail App Password. Please check your credentials in Profile Tab."
+                : errorMessage}
             </div>
-     
+          )}
+
+          {/* Display Success Message */}
+          {successMessage && (
+            <div className="bg-green-100 text-green-800 p-3 mb-4 rounded">
+              {successMessage}
+            </div>
+          )}
+
+          <div className="mb-2 flex space-x-2">
+            {/* Recipient Input Field */}
+            <input
+              type="email"
+              placeholder="Recipient Email"
+              className="w-full p-3 border rounded-lg"
+              value={recipient}
+              onChange={(e) => setRecipient(e.target.value)}
+            />
+            
+            {/* Email Suggestion Button */}
+            <button
+              className="flex-1 text-black-600 hover:text-yellow-300 rounded-lg"
+              onClick={() => setShowSuggestionModal(true)}
+              title="Email Suggestions"
+            >
+              <HiOutlineLightBulb className="h-6 w-6" />
+            </button>
+          </div>
+
+          <div className="mb-2 flex justify-between items-center">
+            <button
+              className="p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+              onClick={() => setShowTemplatesModal(true)}
+            >
+              Use Template
+            </button>
+          </div>
           <input
             type="text"
             placeholder="Subject"
@@ -316,9 +310,153 @@ export default function EmailsPage() {
             </button>
           </div>
         </div>
+        {/* Sent Emails Section */}
+        <div className="bg-gray-50 p-6 rounded-lg shadow-md">
+          <h3 className="text-xl font-semibold mb-4">Sent Emails</h3>
 
-          {/* Modal for Email Suggestions */}
-          {showSuggestionModal && (
+          {/* Search Input */}
+          <input
+            type="text"
+            placeholder="Search emails by subject or content..."
+            className="w-full p-3 mb-4 border rounded-lg"
+            onChange={(e) => setSearchTerm(e.target.value.toLowerCase())}
+          />
+
+          {/* Scrollable Email List */}
+          <div className="bg-white p-4 rounded-lg shadow-lg w-full max-h-[60vh] overflow-y-auto">
+            {filteredEmails.length === 0 ? (
+              <p className="text-gray-500">No emails match your search.</p>
+            ) : (
+              <ul className="divide-y divide-gray-200">
+                {filteredEmails.map((email) => (
+                  <li
+                    key={email.id}
+                    className= "rounded-lg bg-gray-50 mb-4 last:mb-0 shadow-sm"
+                  >
+                    {/* Email Details */}
+                    <div className="p-4 border rounded-lg bg-gray-50 flex justify-between items-center shadow-sm">
+                    <div>
+                      <p>
+                        <strong>To:</strong> {email.recipient}
+                      </p>
+                      <p>
+                        <strong>Subject:</strong> {email.subject}
+                      </p>
+                      <p>
+                        <strong>Content:</strong> {email.content.slice(0, 100)}...
+                      </p>
+                      <p>
+                        <strong>Sent At:</strong>{" "}
+                        {new Date(email.sent_at).toLocaleString()}
+                      </p>
+                    </div>
+                    {/* Delete Button */}
+                    <div>
+                      <button
+                        className="text-white-500 hover:text-red-700 transition"
+                        onClick={() => handleDeleteEmail(email.id)}
+                        title="Delete Email"
+                      >
+                        <AiFillDelete className="h-6 w-6" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+      </div>
+
+      {/* Modal for Generating Email */}
+      {showModal && (
+        <div className="absolute inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-96">
+            <h3 className="text-xl font-semibold mb-4">Generate Email</h3>
+            <input
+              type="text"
+              placeholder="Job Description"
+              className="w-full p-3 mb-4 border rounded-lg"
+              value={jobDescription}
+              onChange={(e) => setJobDescription(e.target.value)}
+            />
+            <input
+              type="text"
+              placeholder="Resume Summary"
+              className="w-full p-3 mb-4 border rounded-lg"
+              value={resumeSummary}
+              onChange={(e) => setResumeSummary(e.target.value)}
+            />
+            {generateError && <p className="text-red-600 mb-4">{generateError}</p>}
+            <div className="flex justify-end space-x-4">
+              <button
+                className="px-4 py-2 rounded-lg bg-gray-300 hover:bg-gray-400 text-gray-800"
+                onClick={() => setShowModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className={`px-4 py-2 rounded-lg text-white ${isGenerating ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
+                onClick={handleGenerateEmail}
+                disabled={isGenerating}
+              >
+                {isGenerating ? 'Generating...' : 'Generate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading Overlay */}
+      {isGenerating && (
+        <div className="absolute inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center">
+            <div className="loader mb-4"></div>
+          <div className="text-white text-lg font-semibold">Generating email...</div>
+        </div>
+      )}
+
+      {/* Templates Modal */}
+      {showTemplatesModal && (
+       <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center">
+       <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-lg">
+         <h3 className="text-xl font-semibold mb-4">Select a Template</h3>
+     
+         {/* Scrollable List Container */}
+         <div className="max-h-[50vh] overflow-y-auto">
+           <ul className="divide-y divide-gray-200">
+              {templates.map((template) => (
+                <li
+                  key={template.id}
+                  className="py-2 cursor-pointer hover:bg-gray-100 rounded-lg"
+                  onClick={() => handleSelectTemplate(template)}
+                >
+                  <h4 className="font-semibold">{template.title}</h4>
+                  <p className="text-sm text-gray-600">
+                    <strong>Subject:</strong> {template.subject}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    <strong>Visibility:</strong> {template.visibility}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            </div>
+            <div className="flex justify-end mt-4">
+              <button
+                className="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 text-gray-800"
+                onClick={() => setShowTemplatesModal(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal for Email Suggestions */}
+      {showSuggestionModal && (
             <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center overflow-y-auto">
               <div className="bg-white p-6 rounded-lg shadow-lg w-96 max-h-[90vh] overflow-y-auto">
                 <h3 className="text-xl font-semibold mb-4">Generate Email Suggestions</h3>
@@ -406,143 +544,8 @@ export default function EmailsPage() {
                 </div>
               </div>
             </div>
-          )}
-
-        {/* Sent Emails Section */}
-        <div className="bg-gray-50 p-6 rounded-lg shadow-md overflow-y-auto">
-        <h3 className="text-xl font-semibold mb-4">Sent Emails</h3>
-        {emails.length === 0 ? (
-          <p className="text-gray-500">No emails sent yet.</p>
-        ) : (
-          <ul className="divide-y divide-gray-200">
-            {emails.map((email) => (
-              <li key={email.id} className="flex justify-between items-center py-4">
-                <div>
-                  <p>
-                    <strong>To:</strong> {email.recipient}
-                  </p>
-                  
-                  <p>
-                    <strong>Subject:</strong> {email.subject}
-                  </p>
-                  <p>
-                    <strong>Content:</strong> {email.content}
-                  </p>
-                  <p>
-                    <strong>Sent At:</strong> {new Date(email.sent_at).toLocaleString()}
-                  </p>
-                </div>
-                <div className="flex items-center space-x-4">
-                <button
-                    className="hover:text-red-800"
-                    onClick={() => handleDeleteEmail(email.id)}>
-                    <AiFillDelete className="h-6 w-6" aria-hidden="true" />
-                </button>
-                  {email.thread_id && (
-                    <button
-                      className={`hover:text-blue-800 ${
-                        isLoadingThread && activeThreadId === email.thread_id ? 'cursor-wait' : ''
-                      }`}
-                      onClick={() => fetchThread(email.thread_id!)}
-                      disabled={isLoadingThread && activeThreadId === email.thread_id}
-                    >
-                      <BiMessageRoundedDetail className="h-6 w-6" aria-hidden="true" />
-                    </button>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {/* Modal for Viewing Threads */}
-      {showThreadModal && (
-        <div className="absolute inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-3/4 max-w-2xl">
-            <h3 className="text-xl font-semibold mb-4">Thread Messages</h3>
-            {isLoadingThread ? (
-              <p className="text-gray-500">Loading thread...</p>
-            ) : threadError ? (
-              <p className="text-red-500">{threadError}</p>
-            ) : thread && thread.length > 0 ? (
-              <ul className="space-y-4">
-                {thread.map((message, index) => (
-                  <li key={index} className="border-b pb-2">
-                    <p>
-                      <strong>From:</strong> {message.from}
-                    </p>
-                    <p>
-                      <strong>Date:</strong> {message.date}
-                    </p>
-                    <p>
-                      <strong>Snippet:</strong> {message.snippet}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-gray-500">No messages in this thread.</p>
-            )}
-            <div className="flex justify-end mt-4">
-              <button
-                className="px-4 py-2 rounded-lg bg-gray-300 hover:bg-gray-400 text-gray-800"
-                onClick={closeThreadModal}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-
-      {/* Modal for Generating Email */}
-      {showModal && (
-        <div className="absolute inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-96">
-            <h3 className="text-xl font-semibold mb-4">Generate Email</h3>
-            <input
-              type="text"
-              placeholder="Job Description"
-              className="w-full p-3 mb-4 border rounded-lg"
-              value={jobDescription}
-              onChange={(e) => setJobDescription(e.target.value)}
-            />
-            <input
-              type="text"
-              placeholder="Resume Summary"
-              className="w-full p-3 mb-4 border rounded-lg"
-              value={resumeSummary}
-              onChange={(e) => setResumeSummary(e.target.value)}
-            />
-            {generateError && <p className="text-red-600 mb-4">{generateError}</p>}
-            <div className="flex justify-end space-x-4">
-              <button
-                className="px-4 py-2 rounded-lg bg-gray-300 hover:bg-gray-400 text-gray-800"
-                onClick={() => setShowModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className={`px-4 py-2 rounded-lg text-white ${isGenerating ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
-                onClick={handleGenerateEmail}
-                disabled={isGenerating}
-              >
-                {isGenerating ? 'Generating...' : 'Generate'}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
-      {/* Loading Overlay */}
-      {isGenerating && (
-        <div className="absolute inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center">
-            <div className="loader mb-4"></div>
-          <div className="text-white text-lg font-semibold">Generating email...</div>
-        </div>
-      )}
     </div>
   );
 }

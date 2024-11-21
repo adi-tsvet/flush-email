@@ -1,11 +1,9 @@
 // tailwind.config.js
-module.exports = {
+export default {
   content: [
-    './src/app/**/*.{js,ts,jsx,tsx}', // Ensure this matches your file paths
-    './src/components/**/*.{js,ts,jsx,tsx}',
-    './src/pages/**/*.{js,ts,jsx,tsx}', // Add other directories if needed
-    './src/**/*.{js,ts,jsx,tsx}',
+    './app/**/*.{js,ts,jsx,tsx}', // Ensure this matches your file paths
     './components/**/*.{js,ts,jsx,tsx}',
+    './src/**/*.{js,ts,jsx,tsx}',
   ],
   theme: {
     extend: {},

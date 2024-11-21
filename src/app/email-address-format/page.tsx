@@ -152,37 +152,39 @@ export default function ManageCompanyFormats() {
         Add New Format
       </button>
 
-      <ul className="divide-y divide-gray-200">
-        {filteredFormats.map((format) => (
-          <li key={format.id} className="flex justify-between items-center py-2">
-            <div>
-              <p>
-                <strong>Company:</strong> {format.company_name}
-              </p>
-              <p>
-                <strong>Domain:</strong> {format.domain}
-              </p>
-              <p>
-                <strong>Format:</strong> {format.email_format}
-              </p>
-            </div>
-            <div className="flex space-x-3">
-              <button
-                className="text-white-600 hover:text-white-200"
-                onClick={() => handleEditFormat(format)}
-              >
-                <AiFillEdit className="h-5 w-5" />
-              </button>
-              <button
-                className="text-red-400 hover:text-red-700"
-                onClick={() => handleDeleteFormat(format.id)}
-              >
-                <AiFillDelete className="h-5 w-5" />
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+      <div className="bg-gray-50 p-4 rounded-lg shadow-lg w-full max-h-[60vh] overflow-y-auto">
+        <ul className="divide-y divide-gray-200">
+          {filteredFormats.map((format) => (
+            <li key={format.id} className="flex justify-between items-center py-2">
+              <div>
+                <p>
+                  <strong>Company:</strong> {format.company_name}
+                </p>
+                <p>
+                  <strong>Domain:</strong> {format.domain}
+                </p>
+                <p>
+                  <strong>Format:</strong> {format.email_format}
+                </p>
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  className="text-white-600 hover:text-white-200"
+                  onClick={() => handleEditFormat(format)}
+                >
+                  <AiFillEdit className="h-5 w-5" />
+                </button>
+                <button
+                  className="text-red-400 hover:text-red-700"
+                  onClick={() => handleDeleteFormat(format.id)}
+                >
+                  <AiFillDelete className="h-5 w-5" />
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       {/* Modal for Add/Edit Format */}
       {showModal && currentFormat && (

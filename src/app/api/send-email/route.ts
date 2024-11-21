@@ -1,111 +1,114 @@
-import { google } from 'googleapis';
-import { NextResponse } from 'next/server';
-import db from '../../../../database/db';
+import { NextResponse } from "next/server";
+import nodemailer from "nodemailer";
+import { authConfig } from "@/app/api/auth/authConfig";
+import { getServerSession } from "next-auth";
+import db from "../../../../database/db";
 
 export async function POST(request: Request) {
   try {
+    // Get the session with username
+    const session = await getServerSession(authConfig);
+    if (!session || !session.user?.id || !session.user?.username) {
+      return NextResponse.json(
+        { error: "Unauthorized: Please log in first." },
+        { status: 401 }
+      );
+    }
+
+    // Fetch Gmail credentials from the database
+    const user = db
+      .prepare(
+        "SELECT gmail_id, gmail_app_password FROM users WHERE id = ?"
+      )
+      .get(session.user.id);
+
+    if (!user || !user.gmail_id || !user.gmail_app_password) {
+      return NextResponse.json(
+        { error: "Gmail credentials not found for the user." },
+        { status: 400 }
+      );
+    }
+
     const { recipient, subject, content } = await request.json();
 
     if (!recipient || !subject || !content) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing required fields." },
+        { status: 400 }
+      );
     }
 
-    const recipients = recipient.split(',').map((email: string) => email.trim());
+    const recipients = recipient.split(",").map((email: string) => email.trim());
 
-    // Initialize Gmail API Client
-    const oAuth2Client = new google.auth.OAuth2(
-      process.env.GMAIL_CLIENT_ID,
-      process.env.GMAIL_CLIENT_SECRET,
-      process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI
-    );
-
-    oAuth2Client.setCredentials({
-      access_token: process.env.GMAIL_ACCESS_TOKEN,
-      refresh_token: process.env.GMAIL_REFRESH_TOKEN,
+    // Nodemailer SMTP configuration
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: user.gmail_id, // Use Gmail ID from the database
+        pass: user.gmail_app_password, // Use Gmail app password from the database
+      },
     });
 
-    const gmail = google.gmail({ version: 'v1', auth: oAuth2Client });
     const results = [];
-
     for (const email of recipients) {
       let emailSent = false;
       let emailSaved = false;
-      let threadId: string | undefined;
       let errorMessage: string | null = null;
 
       try {
-        // Build Raw Email
-        const rawEmail = `To: ${email}\r\nSubject: ${subject}\r\n\r\n${content}`;
-        const encodedEmail = Buffer.from(rawEmail)
-          .toString('base64')
-          .replace(/\+/g, '-')
-          .replace(/\//g, '_')
-          .replace(/=+$/, '');
-
-        // Send Email via Gmail API
-        const sendResponse = await gmail.users.messages.send({
-          userId: 'me',
-          requestBody: { raw: encodedEmail },
+        // Send email
+        const info = await transporter.sendMail({
+          from: user.gmail_id, // Use Gmail ID from the database
+          to: email, // Recipient
+          subject: subject,
+          text: content, // Email content
         });
 
-        threadId = sendResponse.data.threadId ?? undefined;
         emailSent = true;
-      } catch (err) {
-        // Narrow the `error` type
-        if (err instanceof Error) {
-          console.error(`Error sending email to ${email}:`, err.message);
 
-          if (
-            err instanceof Error &&
-            err.message.includes('Address not found')
-          ) {
-            errorMessage = `Email to ${email} could not be sent: Address not found.`;
-          } else {
-            errorMessage = `Email to ${email} failed: ${err.message}.`;
-          }
-        } else {
-          console.error(`Unknown error sending email to ${email}:`, err);
-          errorMessage = `An unknown error occurred for ${email}.`;
-        }
-      }
-
-      if (emailSent) {
+        // Save email to the database
         try {
-          // Save Email in Database
           const stmt = db.prepare(
-            'INSERT INTO emails (recipient, subject, content, sent_at, follow_up, thread_id) VALUES (?, ?, ?, ?, ?, ?)'
+            `INSERT INTO emails (user_id, recipient, subject, content, sent_at, follow_up) 
+             VALUES (?, ?, ?, ?, ?, ?)`
           );
-          stmt.run(email, subject, content, new Date().toISOString(), 0, threadId);
+          stmt.run(
+            session.user.id, // Associate email with the logged-in user
+            email,
+            subject,
+            content,
+            new Date().toISOString(),
+            0
+          );
           emailSaved = true;
+          console.log("Email Saved !!")
         } catch (err) {
-          if (err instanceof Error) {
-            console.error(`Error saving email to ${email}:`, err.message);
-          } else {
-            console.error(`Unknown error saving email to ${email}:`, err);
-          }
+          console.error(`Error saving email to ${email}:`, err);
+          emailSaved = false;
         }
+      } catch (err: any) {
+        console.error(`Error sending email to ${email}:`, err.message);
+        errorMessage = `Failed to send email to ${email}: ${err.message}`;
       }
 
       results.push({
         recipient: email,
         emailSent,
         emailSaved,
-        threadId,
         errorMessage,
       });
     }
 
     return NextResponse.json({
-      status: 'completed',
+      status: "completed",
       results,
-      message: 'Email processing completed.',
+      message: "Emails processed.",
     });
-  } catch (err) {
-    if (err instanceof Error) {
-      console.error('General Error:', err.message);
-    } else {
-      console.error('Unknown General Error:', err);
-    }
-    return NextResponse.json({ error: 'An unexpected error occurred.' }, { status: 500 });
+  } catch (err: any) {
+    console.error("General Error:", err.message);
+    return NextResponse.json(
+      { error: "An unexpected error occurred." },
+      { status: 500 }
+    );
   }
 }
