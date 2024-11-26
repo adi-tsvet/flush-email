@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import db from "../../../../database/db";
+import db from "../../../../database/db"; // MSSQL connection pool
 import { authConfig } from "@/app/api/auth/authConfig";
 import { getServerSession } from "next-auth";
+import sql from "mssql";
 
 export async function GET() {
   try {
@@ -11,16 +12,19 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const templates = db
-      .prepare(
-        `SELECT * 
-         FROM email_templates 
-         WHERE user_id = ? OR visibility = 'public' 
-         ORDER BY created_at DESC`
-      )
-      .all(session.user.id);
+    const pool = await db;
 
-    return NextResponse.json(templates);
+    const result = await pool
+      .request()
+      .input("userId", sql.Int, session.user.id)
+      .query(`
+        SELECT * 
+        FROM EmailTemplates 
+        WHERE user_id = @userId OR visibility = 'public'
+        ORDER BY created_at DESC
+      `);
+
+    return NextResponse.json(result.recordset);
   } catch (error) {
     console.error("Error fetching templates:", error);
     return NextResponse.json({ error: "Failed to fetch templates" }, { status: 500 });
@@ -44,17 +48,20 @@ export async function POST(request: Request) {
       );
     }
 
-    db.prepare(
-      `INSERT INTO email_templates (user_id, title, subject, content, visibility, created_at) 
-       VALUES (?, ?, ?, ?, ?, ?)`
-    ).run(
-      session.user.id,
-      title,
-      subject,
-      content,
-      visibility || "private",
-      new Date().toISOString()
-    );
+    const pool = await db;
+
+    await pool
+      .request()
+      .input("userId", sql.Int, session.user.id)
+      .input("title", sql.NVarChar, title)
+      .input("subject", sql.NVarChar, subject)
+      .input("content", sql.NVarChar, content)
+      .input("visibility", sql.NVarChar, visibility || "private")
+      .input("createdAt", sql.DateTime, new Date())
+      .query(`
+        INSERT INTO EmailTemplates (user_id, title, subject, content, visibility, created_at)
+        VALUES (@userId, @title, @subject, @content, @visibility, @createdAt)
+      `);
 
     return NextResponse.json({ message: "Template added successfully" });
   } catch (error) {
@@ -80,19 +87,34 @@ export async function PUT(request: Request) {
       );
     }
 
-    const existingTemplate = db
-      .prepare("SELECT * FROM email_templates WHERE id = ? AND user_id = ?")
-      .get(id, session.user.id);
+    const pool = await db;
 
-    if (!existingTemplate) {
+    // Validate ownership
+    const existingTemplate = await pool
+      .request()
+      .input("id", sql.Int, id)
+      .input("userId", sql.Int, session.user.id)
+      .query(`
+        SELECT * FROM EmailTemplates WHERE id = @id AND user_id = @userId
+      `);
+
+    if (existingTemplate.recordset.length === 0) {
       return NextResponse.json({ error: "Template not found or unauthorized" }, { status: 403 });
     }
 
-    db.prepare(
-      `UPDATE email_templates 
-       SET title = ?, subject = ?, content = ?, visibility = ? 
-       WHERE id = ?`
-    ).run(title, subject, content, visibility || "private", id);
+    // Update template
+    await pool
+      .request()
+      .input("id", sql.Int, id)
+      .input("title", sql.NVarChar, title)
+      .input("subject", sql.NVarChar, subject)
+      .input("content", sql.NVarChar, content)
+      .input("visibility", sql.NVarChar, visibility || "private")
+      .query(`
+        UPDATE EmailTemplates
+        SET title = @title, subject = @subject, content = @content, visibility = @visibility
+        WHERE id = @id
+      `);
 
     return NextResponse.json({ message: "Template updated successfully" });
   } catch (error) {
@@ -115,15 +137,25 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "ID is required" }, { status: 400 });
     }
 
-    const existingTemplate = db
-      .prepare("SELECT * FROM email_templates WHERE id = ? AND user_id = ?")
-      .get(id, session.user.id);
+    const pool = await db;
 
-    if (!existingTemplate) {
+    // Validate ownership
+    const existingTemplate = await pool
+      .request()
+      .input("id", sql.Int, id)
+      .input("userId", sql.Int, session.user.id)
+      .query(`
+        SELECT * FROM EmailTemplates WHERE id = @id AND user_id = @userId
+      `);
+
+    if (existingTemplate.recordset.length === 0) {
       return NextResponse.json({ error: "Template not found or unauthorized" }, { status: 403 });
     }
 
-    db.prepare("DELETE FROM email_templates WHERE id = ?").run(id);
+    // Delete template
+    await pool.request().input("id", sql.Int, id).query(`
+      DELETE FROM EmailTemplates WHERE id = @id
+    `);
 
     return NextResponse.json({ message: "Template deleted successfully" });
   } catch (error) {

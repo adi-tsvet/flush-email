@@ -1,8 +1,8 @@
-// src/app/api/delete-email/route.ts
 import { NextResponse } from "next/server";
-import db from "../../../../database/db"; // Adjust this path to your db connection
+import db from "../../../../database/db"; // MSSQL connection pool
 import { authConfig } from "@/app/api/auth/authConfig";
 import { getServerSession } from "next-auth";
+import sql from "mssql";
 
 export async function DELETE(request: Request) {
   try {
@@ -21,12 +21,16 @@ export async function DELETE(request: Request) {
       );
     }
 
-    // Validate ownership of the email
-    const email = db
-      .prepare("SELECT * FROM emails WHERE id = ? AND user_id = ?")
-      .get(id, session.user.id);
+    const pool = await db; // Ensure MSSQL connection pool is ready
 
-    if (!email) {
+    // Validate ownership of the email
+    const emailResult = await pool
+      .request()
+      .input("id", sql.Int, id)
+      .input("userId", sql.Int, session.user.id)
+      .query("SELECT * FROM Emails WHERE id = @id AND user_id = @userId");
+
+    if (emailResult.recordset.length === 0) {
       return NextResponse.json(
         { error: "Email not found or unauthorized." },
         { status: 404 }
@@ -34,7 +38,7 @@ export async function DELETE(request: Request) {
     }
 
     // Perform deletion
-    db.prepare("DELETE FROM emails WHERE id = ?").run(id);
+    await pool.request().input("id", sql.Int, id).query("DELETE FROM Emails WHERE id = @id");
 
     return NextResponse.json({ status: "success", message: "Email deleted successfully." });
   } catch (error) {
@@ -42,4 +46,3 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Failed to delete email." }, { status: 500 });
   }
 }
-

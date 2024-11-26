@@ -1,17 +1,24 @@
 import { NextResponse } from "next/server";
-import db from "../../../../database/db"; // Adjust this path for your database setup
+import sql from "mssql"; // Use the mssql library
+import db from "../../../../database/db"; // Connection pool
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const companyName = searchParams.get("companyName");
 
   try {
+    const pool = await db; // Ensure the database connection is ready
+
     if (companyName) {
       // Case-insensitive search for specific company format
-      const stmt = db.prepare(
-        "SELECT email_format, domain FROM company_email_formats WHERE LOWER(company_name) = ?"
-      );
-      const companyFormat = stmt.get(companyName.toLowerCase());
+      const result = await pool
+        .request()
+        .input("companyName", sql.NVarChar, companyName.toLowerCase())
+        .query(
+          "SELECT email_format, domain FROM CompanyEmailFormats WHERE LOWER(company_name) = @companyName"
+        );
+
+      const companyFormat = result.recordset[0]; // Retrieve the first result
 
       if (!companyFormat) {
         return NextResponse.json(
@@ -27,13 +34,18 @@ export async function GET(request: Request) {
       });
     } else {
       // Fetch all formats
-      const stmt = db.prepare("SELECT * FROM company_email_formats ORDER BY company_name");
-      const formats = stmt.all();
-      return NextResponse.json(formats);
+      const result = await pool
+        .request()
+        .query("SELECT * FROM CompanyEmailFormats ORDER BY company_name");
+
+      return NextResponse.json(result.recordset);
     }
   } catch (error) {
     console.error("Error fetching company formats:", error);
-    return NextResponse.json({ error: "Failed to fetch company formats." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch company formats." },
+      { status: 500 }
+    );
   }
 }
 
@@ -45,14 +57,24 @@ export async function POST(request: Request) {
   }
 
   try {
-    db.prepare(
-      "INSERT INTO company_email_formats (company_name, domain, email_format) VALUES (?, ?, ?)"
-    ).run(company_name, domain, email_format);
+    const pool = await db; // Ensure the database connection is ready
+
+    await pool
+      .request()
+      .input("company_name", sql.NVarChar, company_name)
+      .input("domain", sql.NVarChar, domain)
+      .input("email_format", sql.NVarChar, email_format)
+      .query(
+        "INSERT INTO CompanyEmailFormats (company_name, domain, email_format) VALUES (@company_name, @domain, @email_format)"
+      );
 
     return NextResponse.json({ message: "Company format added successfully" });
   } catch (error) {
     console.error("Error saving company format:", error);
-    return NextResponse.json({ error: "Failed to save company format." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to save company format." },
+      { status: 500 }
+    );
   }
 }
 
@@ -64,14 +86,25 @@ export async function PUT(request: Request) {
   }
 
   try {
-    db.prepare(
-      "UPDATE company_email_formats SET company_name = ?, domain = ?, email_format = ? WHERE id = ?"
-    ).run(company_name, domain, email_format, id);
+    const pool = await db; // Ensure the database connection is ready
+
+    await pool
+      .request()
+      .input("id", sql.Int, id)
+      .input("company_name", sql.NVarChar, company_name)
+      .input("domain", sql.NVarChar, domain)
+      .input("email_format", sql.NVarChar, email_format)
+      .query(
+        "UPDATE CompanyEmailFormats SET company_name = @company_name, domain = @domain, email_format = @email_format WHERE id = @id"
+      );
 
     return NextResponse.json({ message: "Company format updated successfully" });
   } catch (error) {
     console.error("Error updating company format:", error);
-    return NextResponse.json({ error: "Failed to update company format." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to update company format." },
+      { status: 500 }
+    );
   }
 }
 
@@ -84,10 +117,19 @@ export async function DELETE(request: Request) {
   }
 
   try {
-    db.prepare("DELETE FROM company_email_formats WHERE id = ?").run(Number(id));
+    const pool = await db; // Ensure the database connection is ready
+
+    await pool
+      .request()
+      .input("id", sql.Int, Number(id))
+      .query("DELETE FROM CompanyEmailFormats WHERE id = @id");
+
     return NextResponse.json({ message: "Company format deleted successfully" });
   } catch (error) {
     console.error("Error deleting company format:", error);
-    return NextResponse.json({ error: "Failed to delete company format." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to delete company format." },
+      { status: 500 }
+    );
   }
 }

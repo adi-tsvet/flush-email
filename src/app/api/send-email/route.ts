@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { authConfig } from "@/app/api/auth/authConfig";
 import { getServerSession } from "next-auth";
-import db from "../../../../database/db";
+import db from "../../../../database/db"; // MSSQL Connection
+import sql from "mssql";
 
 export async function POST(request: Request) {
   try {
@@ -15,12 +16,19 @@ export async function POST(request: Request) {
       );
     }
 
+    const pool = await db;
+
     // Fetch Gmail credentials from the database
-    const user = db
-      .prepare(
-        "SELECT gmail_id, gmail_app_password FROM users WHERE id = ?"
-      )
-      .get(session.user.id);
+    const userResult = await pool
+      .request()
+      .input("userId", sql.Int, session.user.id)
+      .query(`
+        SELECT gmail_id, gmail_app_password 
+        FROM Users 
+        WHERE id = @userId
+      `);
+
+    const user = userResult.recordset[0];
 
     if (!user || !user.gmail_id || !user.gmail_app_password) {
       return NextResponse.json(
@@ -57,7 +65,7 @@ export async function POST(request: Request) {
 
       try {
         // Send email
-        const info = await transporter.sendMail({
+        await transporter.sendMail({
           from: user.gmail_id, // Use Gmail ID from the database
           to: email, // Recipient
           subject: subject,
@@ -68,20 +76,21 @@ export async function POST(request: Request) {
 
         // Save email to the database
         try {
-          const stmt = db.prepare(
-            `INSERT INTO emails (user_id, recipient, subject, content, sent_at, follow_up) 
-             VALUES (?, ?, ?, ?, ?, ?)`
-          );
-          stmt.run(
-            session.user.id, // Associate email with the logged-in user
-            email,
-            subject,
-            content,
-            new Date().toISOString(),
-            0
-          );
+          await pool
+            .request()
+            .input("userId", sql.Int, session.user.id)
+            .input("recipient", sql.VarChar, email)
+            .input("subject", sql.VarChar, subject)
+            .input("content", sql.Text, content)
+            .input("sentAt", sql.DateTime, new Date())
+            .input("followUp", sql.Int, 0)
+            .query(`
+              INSERT INTO Emails (user_id, recipient, subject, content, sent_at, follow_up)
+              VALUES (@userId, @recipient, @subject, @content, @sentAt, @followUp)
+            `);
+
           emailSaved = true;
-          console.log("Email Saved !!")
+          console.log("Email saved to database!");
         } catch (err) {
           console.error(`Error saving email to ${email}:`, err);
           emailSaved = false;
