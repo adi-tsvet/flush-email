@@ -8,6 +8,7 @@ import { useSession, signIn, signOut } from "next-auth/react";
 import { useState } from "react";
 import axios from "axios";
 
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (status === "loading") {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
@@ -36,52 +38,95 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen relative">
       {/* Sidebar */}
-      <aside className="bg-white w-64 p-6 shadow-lg h-screen sticky top-0">
-        <div className="flex items-center mb-10">
-          <Image src="/logo.png" alt="Flush Email Logo" width={40} height={40} className="mr-4" />
-          <h1 className="text-2xl font-bold text-blue-600">Flush Email</h1>
-        </div>
-        <nav className="space-y-4">
-          <Link href="/" className="block p-3 rounded-lg text-gray-700 hover:bg-gray-100">
-            Dashboard
-          </Link>
-          <Link href="/emails" className="block p-3 rounded-lg text-gray-700 hover:bg-gray-100">
-            Emails
-          </Link>
-          <Link
-            href="/email-template"
-            className="block p-3 rounded-lg text-gray-700 hover:bg-gray-100"
+      <div
+        className={`fixed z-20 inset-y-0 left-0 transform transition-transform duration-200 ease-in-out bg-white w-64 shadow-lg md:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+        onClick={() => setSidebarOpen(false)} // Close on click
+      >
+        <aside className="h-full p-6">
+          <div className="flex items-center mb-6">
+            <Image src="/logo.png" alt="Flush Email Logo" width={40} height={40} />
+            <h1 className="text-2xl font-bold text-blue-600 ml-4">Flush Email</h1>
+          </div>
+          <nav className="space-y-4">
+            <Link href="/" className="block p-3 rounded-lg text-gray-700 hover:bg-gray-100">
+              Dashboard
+            </Link>
+            <Link href="/emails" className="block p-3 rounded-lg text-gray-700 hover:bg-gray-100">
+              Emails
+            </Link>
+            <Link
+              href="/email-template"
+              className="block p-3 rounded-lg text-gray-700 hover:bg-gray-100"
+            >
+              Email Template
+            </Link>
+            <Link
+              href="/email-address-format"
+              className="block p-3 rounded-lg text-gray-700 hover:bg-gray-100"
+            >
+              Email Address Format
+            </Link>
+            <Link href="/profile" className="block p-3 rounded-lg text-gray-700 hover:bg-gray-100">
+              Profile
+            </Link>
+            <Link
+              href="/linkedinMessages"
+              className="block p-3 rounded-lg text-gray-700 hover:bg-gray-100"
+            >
+              LinkedIn Messages
+            </Link>
+            <button
+              onClick={() => signOut()}
+              className="block p-3 rounded-lg w-full text-white bg-red-600 hover:bg-red-700"
+            >
+              Log Out
+            </button>
+          </nav>
+        </aside>
+      </div>
+
+      {/* Hamburger Button - Shown Only on Mobile */}
+      {!sidebarOpen && (
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="fixed w-10 mb-10 text-white bg-blue-600 shadow-lg hover:bg-blue-700 transition-all md:hidden top-4"
+          aria-label="Open navigation"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
           >
-            Email Template
-          </Link>
-          <Link
-            href="/email-address-format"
-            className="block p-3 rounded-lg text-gray-700 hover:bg-gray-100"
-          >
-            Email Address Format
-          </Link>
-          <Link href="/profile" className="block p-3 rounded-lg text-gray-700 hover:bg-gray-100">
-            Profile
-          </Link>
-          <Link
-            href="/linkedinMessages"
-            className="block p-3 rounded-lg text-gray-700 hover:bg-gray-100"
-          >
-            LinkedIn Messages
-          </Link>
-          <button
-            onClick={() => signOut()}
-            className="block p-3 rounded-lg w-full text-white bg-red-600 hover:bg-red-700"
-          >
-            Log Out
-          </button>
-        </nav>
-      </aside>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      )}
+
+
+      {/* Overlay for Mobile */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-30 z-10 md:hidden"
+          onClick={() => setSidebarOpen(false)} // Close sidebar on clicking the overlay
+        ></div>
+      )}
 
       {/* Main Content */}
-      <main className="flex-1 p-6 overflow-y-auto">{children}</main>
+      <main
+        className={`flex-1 p-6 transition-all duration-200 ease-in-out ${
+          sidebarOpen ? "blur-sm pointer-events-none md:blur-none" : ""
+        } md:ml-64`}
+        onClick={() => setSidebarOpen(false)} // Close on content click in mobile
+      >
+        {children}
+      </main>
     </div>
   );
 }
@@ -138,13 +183,12 @@ function AuthPage() {
       <h1 className="text-2xl font-bold mb-6">
         {isRegistering ? "Create an Account" : "Log in to Flush Email"}
       </h1>
-      <div className="bg-white p-6 rounded-lg shadow-md w-96">
+      <div className="bg-white p-6 rounded-lg shadow-md w-full max-w-sm">
         {success && isRegistering && <p className="text-green-600 mb-4">Registration successful!</p>}
         {error && <p className="text-red-600 mb-4">{error}</p>}
 
         {isRegistering ? (
           <>
-            {/* Register Form */}
             <input
               type="text"
               placeholder="Username"
@@ -184,7 +228,7 @@ function AuthPage() {
                 Already have an account?{" "}
                 <button
                   onClick={() => setIsRegistering(false)}
-                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 hover:underline"
+                  className="text-blue-600 hover:underline"
                 >
                   Log in
                 </button>
@@ -193,7 +237,6 @@ function AuthPage() {
           </>
         ) : (
           <>
-            {/* Login Form */}
             <input
               type="text"
               placeholder="Username"
@@ -210,7 +253,7 @@ function AuthPage() {
             />
             <button
               onClick={handleLogin}
-              className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 hover:underline"
+              className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
             >
               Log In
             </button>
@@ -219,9 +262,9 @@ function AuthPage() {
                 Don’t have an account?{" "}
                 <button
                   onClick={() => setIsRegistering(true)}
-                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 hover:underline"
+                  className="text-blue-600 hover:underline"
                 >
-                  Register here
+                  Register
                 </button>
               </p>
             </div>

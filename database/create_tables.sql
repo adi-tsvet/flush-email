@@ -1,5 +1,18 @@
 -- nano create_tables.sql
--- sqlcmd -S flush-email-mssql.czjm6iq37yab.us-east-1.rds.amazonaws.com,1433 -U admin -P 'Capricon97'
+-- Save and exit the file:
+
+-- Press Ctrl+O, then press Enter to save.
+-- Press Ctrl+X to exit the nano editor.
+
+-- CREATE DATABASE FlushEmailDB;
+-- GO
+
+-- sqlcmd -S database-flush-email.czjm6iq37yab.us-east-1.rds.amazonaws.com,1433 -U admin -P 'Capricon97' -i create_tables.sql
+
+-- sudo ssh -L 1433:flush-email-mssql.czjm6iq37yab.us-east-1.rds.amazonaws.com:1433 -N -i  ec2-user@3.84.249.0
+-- sudo nano /etc/systemd/system/ssh-tunnel.service
+
+
 
 USE FlushEmailDB;
 GO

@@ -4,7 +4,7 @@ import sql from "mssql";
 const dbConfig = {
   user: process.env.MSSQL_USER!,
   password: process.env.MSSQL_PASSWORD!,
-  server: "localhost",
+  server: process.env.MSSQL_SERVER!,
   database: process.env.MSSQL_DATABASE!,
   options: {
     encrypt: true, // Use SSL
