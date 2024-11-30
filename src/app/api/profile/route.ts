@@ -4,7 +4,7 @@ import { authConfig } from "@/app/api/auth/authConfig";
 import { getServerSession } from "next-auth";
 import sql from "mssql";
 
-export async function GET(request: Request) {
+export async function GET() {
   const session = await getServerSession(authConfig);
 
   if (!session || !session.user) {

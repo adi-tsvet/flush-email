@@ -1,0 +1,138 @@
+.profile-container {
+    max-width: 500px;
+    margin: auto;
+    background: white;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    padding: 20px;
+  }
+  
+  .profile-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    text-align: center;
+    color: #1a202c;
+  }
+  
+  .profile-picture {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  .profile-avatar {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin: 0 auto;
+  }
+  
+  .profile-username {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #1a202c;
+  }
+  
+  .profile-section {
+    margin-top: 15px;
+  }
+  
+  .profile-label {
+    font-size: 0.875rem;
+    color: #4a5568;
+  }
+  
+  .view-field {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .input-field {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #d2d6dc;
+    border-radius: 5px;
+    outline: none;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+  }
+  
+  .input-field:focus {
+    border-color: #3182ce;
+    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.5);
+  }
+  
+  .password-field {
+    display: flex;
+    align-items: center;
+    position: relative;
+  }
+  
+  .toggle-password {
+    position: relative;
+    right: 10px;
+    cursor: pointer;
+  }
+  
+  .action-buttons {
+    display: flex;
+    gap: 10px;
+  }
+  
+  .save-button {
+    background-color: #38a169;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+  }
+  
+  .save-button:hover {
+    background-color: #2f855a;
+  }
+  
+  .cancel-button {
+    background-color: #e2e8f0;
+    color: #2d3748;
+    border: none;
+    border-radius: 5px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+  }
+  
+  .cancel-button:hover {
+    background-color: #cbd5e0;
+  }
+  
+  .edit-button {
+    background: transparent;
+    border: none;
+    color: #3182ce;
+    font-size: 1.25rem;
+    cursor: pointer;
+  }
+  
+  .edit-button:hover {
+    color: #2b6cb0;
+  }
+
+  .success-message {
+    color: green;
+    text-align: center;
+    margin-top: 10px;
+  }
+  
+  .error-message {
+    color: red;
+    text-align: center;
+    margin-top: 10px;
+  }
+  

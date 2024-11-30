@@ -43,6 +43,7 @@ export default function HomePage() {
       });
     } catch (err) {
       setError("Invalid email or password. Please try again.");
+      console.log(err)
     }
   };
 

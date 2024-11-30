@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import axios from "axios";
+import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
+import { MdEdit, MdSave, MdCancel } from "react-icons/md";
 
 export default function ProfilePage() {
   const [username, setUsername] = useState("");
@@ -11,10 +13,14 @@ export default function ProfilePage() {
   const [newGmailAppPassword, setNewGmailAppPassword] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [isEditingGmail, setIsEditingGmail] = useState(false);
+
+  const [isEditingGmailDetails, setIsEditingGmailDetails] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
+
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [showGmailAppPassword, setShowGmailAppPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   // Fetch user profile details
   useEffect(() => {
@@ -25,155 +31,198 @@ export default function ProfilePage() {
         setUsername(username);
         setCurrentGmailId(gmail_id);
         setCurrentGmailAppPassword(gmail_app_password);
-      } catch (err) {
-        console.error("Error fetching profile:", err);
+      } catch (error) {
+        setErrorMessage("Failed to fetch profile details.");
+        console.log(error)
       }
     };
 
     fetchProfile();
   }, []);
 
-  const handleUpdate = async () => {
+  // Automatically hide messages after 5 seconds
+  useEffect(() => {
+    if (successMessage || errorMessage) {
+      const timer = setTimeout(() => {
+        setSuccessMessage("");
+        setErrorMessage("");
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage, errorMessage]);
+
+  // Validation for email
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Handle updating Gmail details
+  const handleSaveGmailDetails = async () => {
     try {
       const payload: any = {};
-      if (isEditingGmail) {
-        payload.gmailId = newGmailId || currentGmailId;
-        payload.gmailAppPassword = newGmailAppPassword || currentGmailAppPassword;
+      if (newGmailId && !validateEmail(newGmailId)) {
+        setErrorMessage("Please enter a valid Gmail ID.");
+        return;
       }
-      if (isEditingPassword) {
-        payload.currentPassword = currentPassword;
-        payload.newPassword = newPassword;
-      }
+
+      payload.gmailId = newGmailId || currentGmailId;
+      payload.gmailAppPassword = newGmailAppPassword || currentGmailAppPassword;
 
       const response = await axios.put("/api/profile", payload);
 
       if (response.status === 200) {
-        setSuccessMessage("Profile updated successfully!");
-        setErrorMessage("");
-
-        if (isEditingGmail) {
-          setCurrentGmailId(newGmailId || currentGmailId);
-          setCurrentGmailAppPassword(newGmailAppPassword || currentGmailAppPassword);
-          setIsEditingGmail(false);
-        }
-
-        if (isEditingPassword) {
-          setCurrentPassword("");
-          setNewPassword("");
-          setIsEditingPassword(false);
-        }
+        setSuccessMessage("Gmail details updated successfully!");
+        setCurrentGmailId(newGmailId || currentGmailId);
+        setCurrentGmailAppPassword(newGmailAppPassword || currentGmailAppPassword);
+        setIsEditingGmailDetails(false);
       }
-    } catch (err: any) {
-      setErrorMessage(err.response?.data?.error || "Failed to update profile.");
-      setSuccessMessage("");
+    } catch (error: any) {
+      setErrorMessage("Failed to update Gmail details.");
+      console.log(error)
+    }
+  };
+
+  // Handle updating password
+  const handleSavePassword = async () => {
+    try {
+      if (!currentPassword || !newPassword) {
+        setErrorMessage("Both current and new passwords are required.");
+        return;
+      }
+
+      const payload = { currentPassword, newPassword };
+      const response = await axios.put("/api/profile", payload);
+
+      if (response.status === 200) {
+        setSuccessMessage("Password updated successfully!");
+        setCurrentPassword("");
+        setNewPassword("");
+        setIsEditingPassword(false);
+      }
+    } catch (error: any) {
+      setErrorMessage("Failed to update password. Please try again.");
+      console.log(error)
     }
   };
 
   return (
-    <div className="max-w-3xl mx-auto bg-white shadow-md rounded-lg p-8">
-      <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">Profile</h1>
-      
-      {successMessage && (
-        <p className="text-green-600 text-center mb-4">{successMessage}</p>
-      )}
-      {errorMessage && (
-        <p className="text-red-600 text-center mb-4">{errorMessage}</p>
-      )}
+    <div className="profile-container">
+      <h1 className="profile-title">Profile</h1>
 
-      {/* Username */}
-      <div className="mb-8">
-        <label className="block font-semibold text-gray-700 mb-2">Username:</label>
-        <p className="text-gray-800">{username}</p>
+      {/* Success/Error Messages */}
+      {successMessage && <p className="success-message">{successMessage}</p>}
+      {errorMessage && <p className="error-message">{errorMessage}</p>}
+
+      {/* Profile Picture and Username */}
+      <div className="profile-picture">
+        <img
+          src="https://via.placeholder.com/150"
+          alt="Profile"
+          className="profile-avatar"
+        />
+        <h2 className="profile-username">{username}</h2>
       </div>
 
       {/* Gmail Details */}
-      <div className="mb-8">
-        <label className="block font-semibold text-gray-700 mb-2">Gmail ID:</label>
-        {isEditingGmail ? (
-          <div className="space-y-4">
+      <div className="profile-section">
+        <label className="profile-label">Gmail Details</label>
+        {isEditingGmailDetails ? (
+          <div className="editable-field">
             <input
               type="email"
-              placeholder="New Gmail ID"
-              className="w-full p-3 border rounded-lg"
-              value={newGmailId}
+              className="input-field"
+              value={newGmailId || currentGmailId}
               onChange={(e) => setNewGmailId(e.target.value)}
+              placeholder="Enter Gmail ID"
             />
-            <input
-              type="password"
-              placeholder="New Gmail App Password"
-              className="w-full p-3 border rounded-lg"
-              value={newGmailAppPassword}
-              onChange={(e) => setNewGmailAppPassword(e.target.value)}
-            />
-            <div className="flex justify-end space-x-4">
-              <button
-                onClick={handleUpdate}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            <div className="password-field">
+              <input
+                type={showGmailAppPassword ? "text" : "password"}
+                className="input-field"
+                value={newGmailAppPassword || currentGmailAppPassword}
+                onChange={(e) => setNewGmailAppPassword(e.target.value)}
+                placeholder="Enter Gmail App Password"
+              />
+              <span
+                onClick={() => setShowGmailAppPassword(!showGmailAppPassword)}
+                className="toggle-password"
               >
-                Save
+                {showGmailAppPassword ? <AiOutlineEyeInvisible /> : <AiOutlineEye />}
+              </span>
+            </div>
+            <div className="action-buttons">
+              <button onClick={handleSaveGmailDetails} className="save-button">
+                <MdSave />
               </button>
               <button
-                onClick={() => setIsEditingGmail(false)}
-                className="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400"
+                onClick={() => setIsEditingGmailDetails(false)}
+                className="cancel-button"
               >
-                Cancel
+                <MdCancel />
               </button>
             </div>
           </div>
         ) : (
-          <div className="flex justify-between items-center">
-            <p className="text-gray-800">{currentGmailId}</p>
+          <div className="view-field">
+            <p>Email: {currentGmailId}</p>
+            <p>Password: ******</p>
             <button
-              onClick={() => setIsEditingGmail(true)}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              onClick={() => setIsEditingGmailDetails(true)}
+              className="edit-button"
             >
-              Edit
+              <MdEdit />
             </button>
           </div>
         )}
       </div>
 
-      {/* Password Change */}
-      <div className="mb-8">
-        <label className="block font-semibold text-gray-700 mb-2">Change Password:</label>
+      {/* Change Password */}
+      <div className="profile-section">
+        <label className="profile-label">Change Password</label>
         {isEditingPassword ? (
-          <div className="space-y-4">
+          <div className="editable-field">
             <input
               type="password"
+              className="input-field"
               placeholder="Current Password"
-              className="w-full p-3 border rounded-lg"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
             />
-            <input
-              type="password"
-              placeholder="New Password"
-              className="w-full p-3 border rounded-lg"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
-            <div className="flex justify-end space-x-4">
-              <button
-                onClick={handleUpdate}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            <div className="password-field">
+              <input
+                type={showNewPassword ? "text" : "password"}
+                className="input-field"
+                placeholder="New Password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+              <span
+                onClick={() => setShowNewPassword(!showNewPassword)}
+                className="toggle-password"
               >
-                Save
+                {showNewPassword ? <AiOutlineEyeInvisible /> : <AiOutlineEye />}
+              </span>
+            </div>
+            <div className="action-buttons">
+              <button onClick={handleSavePassword} className="save-button">
+                <MdSave />
               </button>
               <button
                 onClick={() => setIsEditingPassword(false)}
-                className="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400"
+                className="cancel-button"
               >
-                Cancel
+                <MdCancel />
               </button>
             </div>
           </div>
         ) : (
-          <div className="flex justify-end">
+          <div className="view-field">
             <button
               onClick={() => setIsEditingPassword(true)}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="edit-button"
             >
-              Change Password
+              <MdEdit />
             </button>
           </div>
         )}

@@ -74,10 +74,10 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
               Profile
             </Link>
             <Link
-              href="/linkedinMessages"
+              href="/linkedinScrapper"
               className="block p-3 rounded-lg text-gray-700 hover:bg-gray-100"
             >
-              LinkedIn Messages
+              LinkedIn Scrapper
             </Link>
             <button
               onClick={() => signOut()}
@@ -154,6 +154,7 @@ function AuthPage() {
       }
     } catch (err) {
       setError("An error occurred. Please try again.");
+      console.log(err)
     }
   };
 
@@ -174,6 +175,7 @@ function AuthPage() {
       }
     } catch (err) {
       setError("Registration failed. Please try again.");
+      console.log(err)
     }
   };
 
