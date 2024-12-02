@@ -50,30 +50,28 @@ Flush Email is a feature-rich email management application built with Next.js an
 ### **Environment Variables**
 Create a `.env` file in the root directory with the following keys:
 
-```env
+`env
 MSSQL_USER=your_mssql_username
 MSSQL_PASSWORD=your_mssql_password
 MSSQL_SERVER=your_mssql_server
 MSSQL_DATABASE=your_mssql_database
 MSSQL_PORT=1433
 NEXTAUTH_SECRET=your_nextauth_secret
-NEXTAUTH_URL=http://localhost:3000
-```
+NEXTAUTH_URL=http://localhost:3000`
 
 ### **Installation**
 - Clone the repository:
-```git clone https://github.com/yourusername/flush-email.git
-cd flush-email```
+`git clone https://github.com/yourusername/flush-email.git
+cd flush-email`
 - Install dependencies:
-```npm install```
+  `npm install`
 - Run the development server:
-```npm run dev```
+  `npm run dev`
 - Open the app in your browser at `http://localhost:3000`.
 
 ### **Database Setup**
 - Use the provided SQL schema to create the database tables in your MSSQL instance:
-```
-USE FlushEmailDB;
+`USE FlushEmailDB;
 
 CREATE TABLE Users (
     id INT IDENTITY(1,1) PRIMARY KEY,
@@ -112,8 +110,8 @@ CREATE TABLE CompanyEmailFormats (
     company_name NVARCHAR(255) UNIQUE NOT NULL,
     domain NVARCHAR(255) NOT NULL,
     email_format NVARCHAR(255) NOT NULL
-);
-```
+);`
+
 ### **Building for Production**
 - Build the project:
 `npm run build`
