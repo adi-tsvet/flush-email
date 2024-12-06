@@ -8,6 +8,7 @@ declare module "next-auth" {
       username: string; // Username
       gmailId: string; // Gmail address
       gmailAppPassword: string; // Gmail app password
+      isAdmin: boolean;
     };
   }
 
@@ -17,6 +18,7 @@ declare module "next-auth" {
     email?: string | null; // Optional email address
     gmailId: string; // Gmail address
     gmailAppPassword: string; // Gmail app password
+    isAdmin: boolean;
   }
 
   interface User {
@@ -25,6 +27,7 @@ declare module "next-auth" {
     email?: string | null; // Optional email address
     gmailId: string; // Gmail address
     gmailAppPassword: string; // Gmail app password
+    isAdmin: boolean;
   }
 
   interface AdapterUser {
@@ -33,5 +36,6 @@ declare module "next-auth" {
     email?: string | null; // Optional email address
     gmailId: string; // Gmail address
     gmailAppPassword: string; // Gmail app password
+    isAdmin: boolean;
   }
 }

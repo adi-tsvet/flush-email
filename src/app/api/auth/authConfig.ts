@@ -48,6 +48,7 @@ export const authConfig: NextAuthOptions = {
             username: user.username,
             gmailId: user.gmail_id,
             gmailAppPassword: user.gmail_app_password,
+            isAdmin: user.is_admin, // Convert BIT to boolean
           };
         } catch (error) {
           console.error("Error authorizing user:", error);
@@ -63,6 +64,7 @@ export const authConfig: NextAuthOptions = {
         token.username = user.username;
         token.gmailId = user.gmailId;
         token.gmailAppPassword = user.gmailAppPassword;
+        token.isAdmin = user.isAdmin; // Add isAdmin to the token
       }
       return token;
     },
@@ -73,7 +75,9 @@ export const authConfig: NextAuthOptions = {
         username: token.username as string,
         gmailId: token.gmailId as string,
         gmailAppPassword: token.gmailAppPassword as string,
+        isAdmin: token.isAdmin as boolean, // Include isAdmin in the session
       };
+
       return session;
     },
   },

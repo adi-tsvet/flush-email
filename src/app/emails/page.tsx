@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import axios from 'axios';
-import { useRouter } from 'next/navigation'; // For navigation to Add Email Format page
 import { AiFillDelete } from 'react-icons/ai'; // Trash Icon
 import { HiOutlineLightBulb } from 'react-icons/hi'; // Suggestion Icon
 
@@ -45,7 +44,9 @@ export default function EmailsPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false); // Template Modal
   const [searchTerm, setSearchTerm] = useState("");
-  const router = useRouter(); // For navigating to the Add Email Format page
+  const [users, setUsers] = useState<{ firstName: string; lastName: string }[]>([]);
+  const [step, setStep] = useState<"company" | "users">("company"); // Modal steps
+  const [companyName, setCompanyName] = useState<string>(""); // Company name
 
   const fetchEmails = async () => {
     try {
@@ -103,7 +104,7 @@ export default function EmailsPage() {
     }
   };
   
-  const handleGenerateEmail = async () => {
+  const handleGenerateEmailBody = async () => {
     if (!jobDescription || !resumeSummary) {
       setGenerateError('Please provide both job description and resume summary.');
       return;
@@ -147,60 +148,88 @@ export default function EmailsPage() {
     }
   };
 
-  const handleGenerateEmails = async () => {
-    if (!firstName || !lastName || !companyDomain) {
-      alert('Please fill in all fields: First Name, Last Name, and Company Domain.');
+  const handleValidateCompany = async () => {
+    if (!companyName) {
+      alert("Please enter a company name.");
       return;
     }
-  
+
     try {
-      const response = await axios.get(`/api/company-format?companyName=${companyDomain}`);
-      const { email_format, domain } = response.data;
-  
-      if (email_format && domain) {
-        const email = email_format
-          .replace("{firstname}", firstName.toLowerCase())
-          .replace("{lastname}", lastName.toLowerCase())
-          .replace("{f}", firstName[0].toLowerCase())
-          .replace("{l}", lastName[0].toLowerCase())
-          .replace("{domain}", domain.toLowerCase());
-  
-        setEmailSuggestions([email]);
+      const response = await axios.get(`/api/company-format?companyName=${companyName}`);
+      const { domain } = response.data;
+
+      if (domain) {
+        setCompanyDomain(domain);
+        setStep("users");
       } else {
-        // This block is unlikely to be reached due to the backend logic.
-        alert(`No format found for ${companyDomain}. Redirecting to Add Email Format page.`);
-        router.push('/email-address-format');
+        alert(`No format found for ${companyName}. Please Add Email Format for ${companyName}.`);
+        // router.push('/email-address-format');
       }
     } catch (error: any) {
       if (error.response && error.response.status === 404) {
-        // Handle 404 - Company format not found
-        alert(`No format found for ${companyDomain}. Redirecting to Add Email Format page.`);
-        router.push('/email-address-format');
+        alert(`No format found for ${companyName}. Please check the Email Format for ${companyName}.`);
+        // router.push('/email-address-format');
       } else {
-        console.error('Error fetching company format:', error);
-        alert('An unexpected error occurred while fetching the company format.');
+        console.error("Error validating company:", error);
+        alert("An unexpected error occurred while validating the company.");
       }
     }
   };
-  
+
+  const handleAddUser = () => {
+    setUsers((prev) => [...prev, { firstName: "", lastName: "" }]);
+  };
+
+  const handleUserChange = (index: number, key: "firstName" | "lastName", value: string) => {
+    setUsers((prev) =>
+      prev.map((user, idx) =>
+        idx === index ? { ...user, [key]: value } : user
+      )
+    );
+  };
+
+  const handleRemoveUser = (index: number) => {
+    setUsers((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleGenerateEmails = () => {
+    if (!companyDomain || users.some((user) => !user.firstName || !user.lastName)) {
+      alert("Please fill in all fields for all users.");
+      return;
+    }
+
+    const emailFormat = "{firstname}.{lastname}@{domain}"; // Example format; replace with dynamic format
+    const suggestions = users.map((user) =>
+      emailFormat
+        .replace("{firstname}", user.firstName.toLowerCase())
+        .replace("{lastname}", user.lastName.toLowerCase())
+        .replace("{domain}", companyDomain.toLowerCase())
+    );
+    setEmailSuggestions(suggestions);
+  };
+ 
   const handleAddRecipients = () => {
     setRecipient((prev) => `${prev}${prev ? ', ' : ''}${selectedEmails.join(', ')}`);
     setShowSuggestionModal(false); // Close Modal
-    setEmailSuggestions([]);
-    setSelectedEmails([]);
-    setFirstName('');
-    setLastName('');
-    setCompanyDomain('');
+    resetSuggestionModal();
   };
-
+  
   const handleCancelSuggestion = () => {
     setShowSuggestionModal(false); // Close Modal
+    resetSuggestionModal();
+  };
+  
+  const resetSuggestionModal = () => {
     setEmailSuggestions([]);
     setSelectedEmails([]);
     setFirstName('');
     setLastName('');
     setCompanyDomain('');
+    setCompanyName(''); // Reset company name
+    setUsers([]);
+    setStep("company"); // Reset step to "company"
   };
+  
 
   const fetchTemplates = async () => {
     try {
@@ -399,7 +428,7 @@ export default function EmailsPage() {
               </button>
               <button
                 className={`px-4 py-2 rounded-lg text-white ${isGenerating ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
-                onClick={handleGenerateEmail}
+                onClick={handleGenerateEmailBody}
                 disabled={isGenerating}
               >
                 {isGenerating ? 'Generating...' : 'Generate'}
@@ -457,93 +486,144 @@ export default function EmailsPage() {
 
       {/* Modal for Email Suggestions */}
       {showSuggestionModal && (
-            <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center overflow-y-auto">
-              <div className="bg-white p-6 rounded-lg shadow-lg w-96 max-h-[90vh] overflow-y-auto">
-                <h3 className="text-xl font-semibold mb-4">Generate Email Suggestions</h3>
+        <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center overflow-y-auto">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-96 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-semibold mb-4">
+              {step === "company" ? "Validate Company" : "Generate Email Suggestions"}
+            </h3>
 
-                {/* Input Fields */}
+            {/* Step 1: Validate Company */}
+            {step === "company" && (
+              <div>
                 <input
                   type="text"
-                  placeholder="First Name"
+                  placeholder="Enter Company Name"
                   className="w-full p-3 mb-4 border rounded-lg"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
                 />
-                <input
-                  type="text"
-                  placeholder="Last Name"
-                  className="w-full p-3 mb-4 border rounded-lg"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                />
-                <input
-                  type="text"
-                  placeholder="Company Domain (e.g., example.com)"
-                  className="w-full p-3 mb-4 border rounded-lg"
-                  value={companyDomain}
-                  onChange={(e) => setCompanyDomain(e.target.value)}
-                />
-
-                {/* Generate Button */}
                 <button
-                  className="w-full p-3 rounded-lg text-white bg-green-600 hover:bg-green-700 mb-4"
-                  onClick={handleGenerateEmails}
+                  onClick={handleValidateCompany}
+                  className="w-full p-3 rounded-lg text-white bg-blue-600 hover:bg-blue-700"
                 >
-                  Generate Suggestions
+                  Next
                 </button>
+              </div>
+            )}
 
-                {/* Email Suggestions */}
-                {emailSuggestions.length > 0 && (
-                  <div className="mb-4">
-                    {/* Title */}
-                    <h4 className="font-medium mb-2">Suggested Emails:</h4>
-
-                    {/* Email Suggestions List */}
-                    <ul className="space-y-2">
-                      {emailSuggestions.map((email, index) => (
-                        <li
-                          key={index}
-                          className="flex items-center justify-start space-x-4"
-                        >
-                          {/* Checkbox for selecting emails */}
-                          <input
-                            type="checkbox"
-                            value={email}
-                            className="w-5 h-5"
-                            onChange={(e) => {
-                              const checked = e.target.checked;
-                              setSelectedEmails((prev) =>
-                                checked ? [...prev, email] : prev.filter((em) => em !== email)
-                              );
-                            }}
-                          />
-                          {/* Display Email */}
-                          <label className="text-gray-700">{email}</label>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex justify-end space-x-4">
+            {/* Step 2: Add Users */}
+            {step === "users" && (
+              <div>
+                <div className="mb-4">
+                  <h3 className="text-lg font-semibold mb-4">Add Users</h3>
+                  {users.map((user, index) => (
+                    <div key={index} className="flex items-center space-x-4 mb-2">
+                      <input
+                        type="text"
+                        placeholder="First Name"
+                        className="w-full p-3 border rounded-lg"
+                        value={user.firstName}
+                        onChange={(e) =>
+                          handleUserChange(index, "firstName", e.target.value)
+                        }
+                      />
+                      <input
+                        type="text"
+                        placeholder="Last Name"
+                        className="w-full p-3 border rounded-lg"
+                        value={user.lastName}
+                        onChange={(e) =>
+                          handleUserChange(index, "lastName", e.target.value)
+                        }
+                      />
+                      <button
+                        onClick={() => handleRemoveUser(index)}
+                        className="text-red-600 hover:text-red-800"
+                        title="Remove User"
+                      >
+                        <AiFillDelete className="h-5 w-5" />
+                      </button>
+                    </div>
+                  ))}
                   <button
-                    className="px-4 py-2 rounded-lg bg-gray-300 hover:bg-gray-400 text-gray-800"
-                    onClick={() => handleCancelSuggestion()}
+                    onClick={handleAddUser}
+                    className="w-full p-3 rounded-lg text-white bg-blue-600 hover:bg-blue-700"
                   >
-                    Cancel
-                  </button>
-                  <button
-                    className={`px-4 py-2 rounded-lg text-white ${
-                      selectedEmails.length === 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
-                    }`}
-                    onClick={handleAddRecipients}
-                    disabled={selectedEmails.length === 0}>
-                    Add to Recipients
+                    Add Another User
                   </button>
                 </div>
+
+                <button
+                  onClick={handleGenerateEmails}
+                  className="w-full p-3 mb-4 rounded-lg text-white bg-green-600 hover:bg-green-700"
+                >
+                  Generate Emails
+                </button>
               </div>
+            )}
+
+            {/* Email Suggestions */}
+            {emailSuggestions.length > 0 && (
+              <div className="mb-4">
+                <h4 className="font-medium mb-2">Suggested Emails:</h4>
+                <button
+                  onClick={
+                    selectedEmails.length === emailSuggestions.length
+                      ? () => setSelectedEmails([])
+                      : () => setSelectedEmails([...emailSuggestions])
+                  }
+                  className="p-2 mb-2 text-sm rounded-lg text-white bg-blue-600 hover:bg-blue-700"
+                >
+                  {selectedEmails.length === emailSuggestions.length
+                    ? "Deselect All"
+                    : "Select All"}
+                </button>
+                <ul className="space-y-2">
+                  {emailSuggestions.map((email, index) => (
+                    <li key={index} className="flex items-center space-x-4">
+                      <input
+                        type="checkbox"
+                        value={email}
+                        className="w-5 h-5"
+                        checked={selectedEmails.includes(email)}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setSelectedEmails((prev) =>
+                            checked
+                              ? [...prev, email]
+                              : prev.filter((em) => em !== email)
+                          );
+                        }}
+                      />
+                      <label className="text-gray-700">{email}</label>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex justify-end space-x-4">
+              <button
+                className="px-4 py-2 rounded-lg bg-gray-300 hover:bg-gray-400 text-gray-800"
+                onClick={() => handleCancelSuggestion()}
+              >
+                Cancel
+              </button>
+              <button
+                className={`px-4 py-2 rounded-lg text-white ${
+                  selectedEmails.length === 0
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700"
+                }`}
+                onClick={handleAddRecipients}
+                disabled={selectedEmails.length === 0}
+              >
+                Add to Recipients
+              </button>
             </div>
+          </div>
+        </div>
       )}
 
     </div>

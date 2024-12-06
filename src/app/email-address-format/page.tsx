@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { AiFillDelete, AiFillEdit } from "react-icons/ai";
+import { useSession } from "next-auth/react";
 
 type CompanyFormat = {
   id: number;
@@ -38,6 +39,16 @@ export default function ManageCompanyFormats() {
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [customFormat, setCustomFormat] = useState(""); // Custom email format
+  const { data: session } = useSession(); // Fetch session
+  const [isAdmin, setIsAdmin] = useState(false); // Admin status
+
+  console.log("is Admin ", session?.user)
+
+  useEffect(() => {
+    if (session?.user) {
+      setIsAdmin(session.user.isAdmin); 
+    }
+  }, [session]);
 
   // Fetch Company Formats
   const fetchCompanyFormats = async () => {
@@ -167,6 +178,7 @@ export default function ManageCompanyFormats() {
                   <strong>Format:</strong> {format.email_format}
                 </p>
               </div>
+              {isAdmin && (
               <div className="flex space-x-3">
                 <button
                   className="text-white-600 hover:text-white-200"
@@ -181,6 +193,7 @@ export default function ManageCompanyFormats() {
                   <AiFillDelete className="h-5 w-5" />
                 </button>
               </div>
+              )}
             </li>
           ))}
         </ul>

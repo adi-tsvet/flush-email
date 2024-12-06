@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import sql from "mssql"; // Use the mssql library
 import db from "../../../../database/db"; // Connection pool
+import { authConfig } from "@/app/api/auth/authConfig";
+import { getServerSession } from "next-auth";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -119,6 +121,28 @@ export async function DELETE(request: Request) {
   try {
     const pool = await db; // Ensure the database connection is ready
 
+    // Get the user's session info
+    const session = await getServerSession(authConfig);
+
+    if (!session || !session.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const userId = session.user.id;
+
+    // Check if the user is an admin
+    const userResult = await pool
+      .request()
+      .input("userId", sql.Int, userId)
+      .query("SELECT is_admin FROM Users WHERE id = @userId");
+
+    const user = userResult.recordset[0];
+
+    if (!user || !user.is_admin) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
+
+    // Proceed to delete the company format
     await pool
       .request()
       .input("id", sql.Int, Number(id))
