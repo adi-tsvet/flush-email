@@ -56,17 +56,16 @@ button {
 }
 
 button {
-  background-color: #0070f3;
-  color: white;
+  color: rgb(6, 6, 6);
   border: none;
   cursor: pointer;
   padding: 10px;
   margin-top: 10px;
 }
 
-button:hover {
-  background-color: #005bb5;
-}
+/* button:hover {
+  background-color: #b2e9cb;
+} */
 .loader {
   border: 4px solid #f3f3f3;
   border-top: 4px solid #3498db;

@@ -1,8 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
 import axios from "axios";
-import { AiFillDelete, AiFillEdit } from "react-icons/ai";
+import { AiFillDelete, AiFillEdit, AiFillEye} from "react-icons/ai";
 import { useSession } from "next-auth/react";
+import TiptapEditor from "../components/TiptapEditor"; // Ensure the path matches where your TiptapEditor component is located
+
 
 type Template = {
   id: number;
@@ -10,7 +12,7 @@ type Template = {
   subject: string;
   content: string;
   visibility: "private" | "public";
-  userId?: number; // User ID to determine ownership
+  user_id: number; // User ID to determine ownership
 };
 
 export default function TemplateManager() {
@@ -26,9 +28,11 @@ export default function TemplateManager() {
     visibility: "private",
   });
   const [loading, setLoading] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  
 
   // Fetch Templates and Current User Info
-  const fetchTemplates = async () => {
+  const fetchTemplates = async () => { 
     try {
       const response = await axios.get("/api/email-templates");
       setTemplates(response.data);
@@ -85,10 +89,23 @@ export default function TemplateManager() {
     }
   };
 
-  const filteredTemplates = templates.filter(
-    (template) => template.visibility === currentTab || currentTab === "private"
-  );
+  const handleViewTemplate = (template: Template) => {
+    setSelectedTemplate(template);
+    setShowViewModal(true);
+  };
 
+  const filteredTemplates = templates.filter((template) => {
+    if (currentTab === "private") {
+      // Show current user's private templates and their public templates
+      return (
+        template.user_id === session?.user?.id && 
+        (template.visibility === "private" || template.visibility === "public")
+      );
+    } else {
+      // Show all public templates
+      return template.visibility === "public";
+    }
+  });
   return (
     <div className="bg-white shadow-md rounded-lg p-6">
       <h2 className="text-2xl font-semibold mb-6">Manage Email Templates</h2>
@@ -112,9 +129,6 @@ export default function TemplateManager() {
           Public Templates
         </button>
       </div>
-
-      {/* Add Template Button */}
-      {currentTab === "private" && (
         <button
           className="w-full p-3 rounded-lg text-white bg-blue-600 hover:bg-blue-700 mb-4"
           onClick={() => {
@@ -125,7 +139,6 @@ export default function TemplateManager() {
         >
           Add New Template
         </button>
-      )}
 
       {/* Templates List */}
       <div className="bg-gray-50 p-4 rounded-lg shadow-lg w-full max-h-[70vh] overflow-y-auto">
@@ -138,12 +151,27 @@ export default function TemplateManager() {
                 <strong>Subject:</strong> {template.subject}
               </p>
               <p className="text-gray-700 mt-2">
-                <strong>Content:</strong> {template.content.slice(0,50)}...
+                <strong>Content:</strong> 
+        
               </p>
+              {/* Render HTML Content Safely */}
+              <div
+                className="text-gray-700 mt-2"
+                dangerouslySetInnerHTML={{
+                  __html: `${template.content.slice(0, 30)} .........`,
+                }}
+              ></div>
             </div>
             <div className="flex items-center space-x-3">
-              {currentTab === "private" || template.userId === session?.user?.id ? (
-                <>
+              {/* View Button */}
+            <button
+                className="hover:text-blue-700"
+                onClick={() => handleViewTemplate(template)}
+              >
+                <AiFillEye className="h-5 w-5" />
+            </button>
+            {currentTab === "private" && template.user_id === session?.user?.id && (
+                <div className="flex items-center space-x-3">
                   <button
                     className="text-gray-700 hover:text-blue-600"
                     onClick={() => {
@@ -165,8 +193,8 @@ export default function TemplateManager() {
                   >
                     <AiFillDelete className="h-5 w-5" />
                   </button>
-                </>
-              ) : (<p></p>)}
+                </div>
+              )}
             </div>
           </li>
         ))}
@@ -194,12 +222,23 @@ export default function TemplateManager() {
               value={newTemplate.subject}
               onChange={(e) => setNewTemplate((prev) => ({ ...prev, subject: e.target.value }))}
             />
-            <textarea
+            {/* <textarea
               placeholder="Template Content"
               className="w-full p-3 mb-4 border rounded-lg"
               rows={6}
               value={newTemplate.content}
               onChange={(e) => setNewTemplate((prev) => ({ ...prev, content: e.target.value }))}
+            /> */}
+
+            {/* Replace Textarea with TiptapEditor */}
+            <TiptapEditor
+              value={newTemplate.content}
+              onChange={(value) =>
+                setNewTemplate((prev) => ({
+                  ...prev,
+                  content: value,
+                }))
+              }
             />
             <div className="flex items-center mb-4">
               <label className="mr-3">Public:</label>
@@ -238,6 +277,30 @@ export default function TemplateManager() {
           </div>
         </div>
       )}
+
+      {showViewModal && selectedTemplate && (
+        <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-96 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-semibold mb-4">{selectedTemplate.title}</h3>
+            <p className="text-gray-700 mb-4">
+              <strong>Subject:</strong> {selectedTemplate.subject}
+            </p>
+            <div
+              className="text-gray-700 mb-4"
+              dangerouslySetInnerHTML={{ __html: selectedTemplate.content }}
+            ></div>
+            <div className="flex justify-end mt-4">
+              <button
+                className="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 text-gray-800"
+                onClick={() => setShowViewModal(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

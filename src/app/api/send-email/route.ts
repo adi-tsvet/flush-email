@@ -4,6 +4,7 @@ import { authConfig } from "@/app/api/auth/authConfig";
 import { getServerSession } from "next-auth";
 import db from "../../../../database/db"; // MSSQL Connection
 import sql from "mssql";
+import striptags from "striptags"; // Import striptags to strip HTML tags
 
 export async function POST(request: Request) {
   try {
@@ -48,6 +49,9 @@ export async function POST(request: Request) {
 
     const recipients = recipient.split(",").map((email: string) => email.trim());
 
+    // Convert HTML content to plain text
+    const plainTextContent = striptags(content);
+
     // Nodemailer SMTP configuration
     const transporter = nodemailer.createTransport({
       service: "gmail",
@@ -69,7 +73,7 @@ export async function POST(request: Request) {
           from: user.gmail_id, // Use Gmail ID from the database
           to: email, // Recipient
           subject: subject,
-          text: content, // Email content
+          html: content, // Use the HTML version of the email content
         });
 
         emailSent = true;
@@ -81,7 +85,7 @@ export async function POST(request: Request) {
             .input("userId", sql.Int, session.user.id)
             .input("recipient", sql.VarChar, email)
             .input("subject", sql.VarChar, subject)
-            .input("content", sql.Text, content)
+            .input("content", sql.Text, plainTextContent)
             .input("sentAt", sql.DateTime, new Date())
             .input("followUp", sql.Int, 0)
             .query(`

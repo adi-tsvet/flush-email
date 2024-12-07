@@ -3,8 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import axios from 'axios';
+import { useRouter } from 'next/navigation'; // For navigation to Add Email Format page
 import { AiFillDelete } from 'react-icons/ai'; // Trash Icon
 import { HiOutlineLightBulb } from 'react-icons/hi'; // Suggestion Icon
+import TiptapEditor from "../components/TiptapEditor"; // Ensure the path matches where your TiptapEditor component is located
+
 
 type Email = {
   id: number;
@@ -41,12 +44,15 @@ export default function EmailsPage() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [companyDomain, setCompanyDomain] = useState('');
+  const [emailFormat, setEmailformat] = useState('');
   const [templates, setTemplates] = useState<Template[]>([]);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false); // Template Modal
   const [searchTerm, setSearchTerm] = useState("");
+  const router = useRouter(); // For navigating to the Add Email Format page
   const [users, setUsers] = useState<{ firstName: string; lastName: string }[]>([]);
   const [step, setStep] = useState<"company" | "users">("company"); // Modal steps
   const [companyName, setCompanyName] = useState<string>(""); // Company name
+
 
   const fetchEmails = async () => {
     try {
@@ -153,22 +159,25 @@ export default function EmailsPage() {
       alert("Please enter a company name.");
       return;
     }
+    console.log("Before try")
 
     try {
       const response = await axios.get(`/api/company-format?companyName=${companyName}`);
-      const { domain } = response.data;
+      const { domain, email_format } = response.data;
+      console.log("Company log : ", response)
 
       if (domain) {
         setCompanyDomain(domain);
+        setEmailformat(email_format);
         setStep("users");
       } else {
-        alert(`No format found for ${companyName}. Please Add Email Format for ${companyName}.`);
-        // router.push('/email-address-format');
+        alert(`No format found for ${companyName}. Redirecting to Add Email Format page.`);
+        router.push('/email-address-format');
       }
     } catch (error: any) {
       if (error.response && error.response.status === 404) {
-        alert(`No format found for ${companyName}. Please check the Email Format for ${companyName}.`);
-        // router.push('/email-address-format');
+        alert(`No format found for ${companyName}. Redirecting to Add Email Format page.`);
+        router.push('/email-address-format');
       } else {
         console.error("Error validating company:", error);
         alert("An unexpected error occurred while validating the company.");
@@ -197,16 +206,27 @@ export default function EmailsPage() {
       alert("Please fill in all fields for all users.");
       return;
     }
-
-    const emailFormat = "{firstname}.{lastname}@{domain}"; // Example format; replace with dynamic format
-    const suggestions = users.map((user) =>
-      emailFormat
-        .replace("{firstname}", user.firstName.toLowerCase())
-        .replace("{lastname}", user.lastName.toLowerCase())
-        .replace("{domain}", companyDomain.toLowerCase())
-    );
-    setEmailSuggestions(suggestions);
+  
+    const emails = users.map((user) => {
+      const { firstName, lastName } = user;
+  
+      // Validate that firstName and lastName are non-empty
+      if (!firstName || !lastName) {
+        throw new Error("Both first name and last name are required for all users.");
+      }
+  
+      // Replace placeholders in the emailFormat
+      return emailFormat
+        .replace("{firstname}", firstName.toLowerCase())
+        .replace("{lastname}", lastName.toLowerCase())
+        .replace("{f}", firstName[0].toLowerCase())
+        .replace("{l}", lastName[0].toLowerCase())
+        .replace("{domain}", companyDomain.toLowerCase());
+    });
+  
+    setEmailSuggestions(emails); // Add the generated emails to suggestions
   };
+  
  
   const handleAddRecipients = () => {
     setRecipient((prev) => `${prev}${prev ? ', ' : ''}${selectedEmails.join(', ')}`);
@@ -229,7 +249,6 @@ export default function EmailsPage() {
     setUsers([]);
     setStep("company"); // Reset step to "company"
   };
-  
 
   const fetchTemplates = async () => {
     try {
@@ -292,13 +311,17 @@ export default function EmailsPage() {
             />
             
             {/* Email Suggestion Button */}
-            <button
-              className="flex-1 text-black-600 hover:text-yellow-300 rounded-lg"
-              onClick={() => setShowSuggestionModal(true)}
-              title="Email Suggestions"
-            >
-              <HiOutlineLightBulb className="h-6 w-6" />
-            </button>
+            <div className="relative group">
+              <button
+                className="flex-1 text-black-600 hover:text-yellow-300 rounded-lg"
+                onClick={() => setShowSuggestionModal(true)}
+              >
+                <HiOutlineLightBulb className="h-6 w-6" />
+              </button>
+              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block bg-black text-white text-xs rounded py-1 px-2">
+                Email Suggestions
+              </span>
+            </div>
           </div>
 
           <div className="mb-2 flex justify-between items-center">
@@ -316,13 +339,16 @@ export default function EmailsPage() {
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
           />
-          <textarea
+          {/* <textarea
             placeholder="Email Content"
             className="w-full p-3 mb-4 border rounded-lg"
             rows={6}
             value={content}
             onChange={(e) => setContent(e.target.value)}
-          />
+          /> */}
+          {/* TiptapEditor for Email Content */}
+          <TiptapEditor value={content} onChange={setContent} />
+  
           <div className="flex space-x-4">
             <button
               className="w-full p-3 rounded-lg text-white bg-blue-600 hover:bg-blue-700"
@@ -489,10 +515,10 @@ export default function EmailsPage() {
         <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center overflow-y-auto">
           <div className="bg-white p-6 rounded-lg shadow-lg w-96 max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-semibold mb-4">
-              {step === "company" ? "Validate Company" : "Generate Email Suggestions"}
+              {step === "company" ? "Enter Company Name" : "Generate Email Suggestions"}
             </h3>
 
-            {/* Step 1: Validate Company */}
+            {/* Step 1: Enter Company Name*/}
             {step === "company" && (
               <div>
                 <input
@@ -549,7 +575,7 @@ export default function EmailsPage() {
                     onClick={handleAddUser}
                     className="w-full p-3 rounded-lg text-white bg-blue-600 hover:bg-blue-700"
                   >
-                    Add Another User
+                    {`Enter ${users.length + 1} person name`}
                   </button>
                 </div>
 
@@ -629,3 +655,4 @@ export default function EmailsPage() {
     </div>
   );
 }
+
